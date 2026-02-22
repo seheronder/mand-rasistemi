@@ -1,0 +1,1397 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mandıra Yönetim Sistemi</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+
+
+    <style>
+        /* GENEL TASARIM */
+        body {
+            background-color: #f0f2f5;
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        /* SOL MENÜ */
+        .sidebar {
+            width: 260px;
+            height: 100vh;
+            position: fixed;
+            background-color: #1a2035;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            z-index: 1000;
+        }
+
+        .sidebar-header {
+            padding: 25px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .sidebar a {
+            color: #adb5bd;
+            text-decoration: none;
+            padding: 15px 25px;
+            display: flex;
+            align-items: center;
+            transition: 0.3s;
+            cursor: pointer;
+            font-size: 1.05rem;
+        }
+
+        .sidebar a:hover, .sidebar a.active {
+            background-color: #2c3e50;
+            color: white;
+            border-left: 5px solid #0d6efd;
+        }
+
+        /* İÇERİK ALANI */
+        .main-content {
+            margin-left: 260px;
+            padding: 30px;
+            width: calc(100% - 260px);
+        }
+
+        .white-box {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 25px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        /* KARTLAR */
+        .stat-card {
+            border: none;
+            border-radius: 15px;
+            padding: 25px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .stat-icon {
+            position: absolute;
+            right: 20px;
+            top: 20px;
+            font-size: 3rem;
+            opacity: 0.2;
+        }
+
+        /* GÖRSELLER VE POS */
+        .urun-img-small {
+            width: 50px;
+            height: 50px;
+            object-fit: cover;
+            border-radius: 8px;
+            border: 1px solid #eee;
+        }
+
+        .pos-item {
+            cursor: pointer;
+            border: 1px solid #eee;
+            border-radius: 12px;
+            padding: 10px;
+            text-align: center;
+            background: white;
+            transition: 0.2s;
+        }
+
+        .pos-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            border-color: #0d6efd;
+        }
+
+        .pos-item img {
+            width: 100%;
+            height: 100px;
+            object-fit: cover;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        .page-section { display: none; }
+
+        #mobilMenuBtn {
+            display: none !important;
+        }
+
+
+        @media (max-width: 768px) {
+            #mobilMenuBtn {
+                display: inline-block !important;
+            }
+
+            .sidebar {
+                left: -260px;
+                transition: 0.3s;
+            }
+            .sidebar.aktif {
+                left: 0;
+                box-shadow: 5px 0 15px rgba(0,0,0,0.3);
+            }
+            .main-content {
+                margin-left: 0;
+                width: 100%;
+            }
+        }
+    </style>
+
+    <script>
+        if (!localStorage.getItem('userId')) {
+            window.location.href = 'login.html';
+        }
+    </script>
+</head>
+<body>
+
+<div class="sidebar">
+    <div class="sidebar-header text-center">
+        <h3><i class="fas fa-cow"></i> Mandıra</h3>
+        <div class="mt-2 p-2 bg-warning text-dark rounded fw-bold small">
+            🔑 KODUNUZ:<br>
+            <span id="lblShopCode" class="user-select-all">...</span>
+        </div>
+    </div>
+
+    <a onclick="sayfaGoster('dashboard', this)" class="menu-link active">
+        <i class="fas fa-home"></i> Ana Sayfa
+    </a>
+    <a onclick="sayfaGoster('urunler', this)" class="menu-link">
+        <i class="fas fa-box-open"></i> Ürünler & Stok
+    </a>
+    <a onclick="sayfaGoster('musteriler', this)" class="menu-link">
+        <i class="fas fa-users"></i> Müşteriler
+    </a>
+    <a onclick="sayfaGoster('satislar', this)" class="menu-link">
+        <i class="fas fa-chart-line"></i> Sipariş Takip
+    </a>
+    <a onclick="sayfaGoster('stokgiris', this)" class="menu-link">
+        <i class="fas fa-truck-loading"></i> Hızlı Stok Ekle
+    </a>
+    <a onclick="sayfaGoster('kuryeler', this)" class="menu-link">
+        <i class="fas fa-motorcycle"></i> Kuryeler
+    </a>
+    <a onclick="sayfaGoster('loglar', this)" class="menu-link">
+        <i class="fas fa-history"></i> İşlem Logları
+    </a>
+
+    <div class="mt-auto p-3">
+        <button class="btn btn-primary w-100 mb-2 py-2 fw-bold" onclick="modalAc('mdlUrunEkle')">
+            Hızlı Ürün Ekle
+        </button>
+        <button class="btn btn-outline-danger w-100 py-2 fw-bold" onclick="cikisYap()">
+            Çıkış Yap
+        </button>
+    </div>
+</div>
+
+<div class="main-content">
+    <button id="mobilMenuBtn" class="btn btn-dark mb-3" onclick="menuyuAcKapa()">
+        <i class="fas fa-bars"></i> MENÜ
+    </button>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 id="sayfaBasligi" class="fw-bold text-dark">Genel Bakış</h2>
+        <button class="btn btn-warning btn-lg text-white shadow fw-bold" onclick="posEkraniAc()">
+            <i class="fas fa-shopping-basket me-2"></i> YENİ SATIŞ YAP
+        </button>
+    </div>
+
+    <div id="sayfa-dashboard" class="page-section" style="display:block;">
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="stat-card bg-primary">
+                    <i class="fas fa-wallet stat-icon"></i>
+                    <h6>TOPLAM CİRO</h6>
+                    <h2 id="d-ciro" class="fw-bold">0 ₺</h2>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-card bg-success">
+                    <i class="fas fa-boxes stat-icon"></i>
+                    <h6>DEPO DEĞERİ</h6>
+                    <h2 id="d-stok" class="fw-bold">0 ₺</h2>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-card bg-danger">
+                    <i class="fas fa-exclamation-triangle stat-icon"></i>
+                    <h6>KRİTİK STOK</h6>
+                    <h2 id="d-alarm" class="fw-bold">0 Adet</h2>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-8">
+                <div class="white-box">
+                    <h5>📊 Haftalık Satış</h5>
+                    <canvas id="chartSatis" height="150"></canvas>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="white-box">
+                    <h5>🏆 En Çok Satanlar</h5>
+                    <canvas id="chartUrun" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="sayfa-urunler" class="page-section">
+        <div class="white-box">
+            <div class="d-flex justify-content-between mb-4">
+                <h4 class="text-primary fw-bold">📦 Ürün Stok Listesi</h4>
+                <div>
+                    <input type="file" id="xlsInput" hidden onchange="excelYukle(this, 'urun')">
+                    <button class="btn btn-success btn-sm me-2" onclick="document.getElementById('xlsInput').click()">Excel Yükle</button>
+                    <button class="btn btn-primary btn-sm" onclick="modalAc('mdlUrunEkle')">Ürün Ekle</button>
+                    <button class="btn btn-warning btn-sm text-white" onclick="stokAnalizAc()">Eksik Listesi</button>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                    <tr><th>Resim</th><th>Ürün Adı</th><th>Birim</th><th>Fiyat</th><th>Stok</th><th>İşlemler</th></tr>
+                    </thead>
+                    <tbody id="tbl-urunler"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="sayfa-musteriler" class="page-section">
+        <div class="white-box">
+            <div class="d-flex justify-content-between mb-3">
+                <h4 class="text-success fw-bold">👥 Müşteri Listesi</h4>
+                <div>
+                    <input type="file" id="xlsMus" hidden onchange="excelYukle(this, 'musteri')">
+                    <button class="btn btn-success btn-sm me-2" onclick="document.getElementById('xlsMus').click()">Excel Yükle</button>
+                    <button class="btn btn-primary btn-sm" onclick="modalAc('mdlMusEkle')">Yeni Müşteri</button>
+                </div>
+            </div>
+
+            <input type="text" id="musArama" class="form-control mb-3 shadow-sm border-primary" placeholder="🔍 Müşteri Adı Ara..." onkeyup="musteriFiltrele()">
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                    <tr><th>Ad Soyad</th><th>Telefon</th><th>Adres</th><th>Kritik Bakiye</th><th>Bakiye</th><th>İşlemler</th></tr>
+                    </thead>
+                    <tbody id="t-mus"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="sayfa-satislar" class="page-section">
+        <div class="white-box">
+            <div class="d-flex justify-content-between mb-3">
+                <h4 class="fw-bold">📝 Sipariş Takip</h4>
+                <button class="btn btn-primary btn-sm" onclick="getSiparisler()">Yenile</button>
+            </div>
+            <ul class="nav nav-pills mb-4" id="siparisTablari">
+                <li class="nav-item">
+                    <button class="nav-link active" onclick="tabDegis('bekleyen', this)">⏳ Bekleyenler (<span id="cnt-bekleyen">0</span>)</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" onclick="tabDegis('yolda', this)">🛵 Yolda (<span id="cnt-yolda">0</span>)</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" onclick="tabDegis('teslim', this)">✅ Teslim (<span id="cnt-teslim">0</span>)</button>
+                </li>
+            </ul>
+            <div id="tab-bekleyen" class="tab-content"><table class="table table-hover align-middle"><tbody id="l-bekleyen"></tbody></table></div>
+            <div id="tab-yolda" class="tab-content" style="display:none"><table class="table table-hover align-middle"><tbody id="l-yolda"></tbody></table></div>
+            <div id="tab-teslim" class="tab-content" style="display:none"><table class="table table-hover align-middle"><tbody id="l-teslim"></tbody></table></div>
+        </div>
+    </div>
+
+    <div id="sayfa-stokgiris" class="page-section">
+        <div class="white-box">
+            <h4 class="fw-bold mb-4 text-primary">Hızlı Stok Girişi</h4>
+            <input type="text" id="stokArama" class="form-control mb-3" placeholder="Ürün Ara..." onkeyup="stokSayfasiniGetir()">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                    <tr><th style="width: 80px;">Resim</th><th>Ürün Adı</th><th>Mevcut</th><th style="width: 250px;">Eklenecek</th><th>İşlem</th></tr>
+                    </thead>
+                    <tbody id="tbl-stokgiris"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div id="sayfa-kuryeler" class="page-section">
+        <div class="white-box">
+            <div class="d-flex justify-content-between mb-3">
+                <h4 class="fw-bold text-dark"><i class="fas fa-motorcycle"></i> Kurye Yönetimi</h4>
+                <button class="btn btn-primary" onclick="modalAc('mdlKuryeEkle')">
+                    <i class="fas fa-plus"></i> Yeni Kurye Ekle
+                </button>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                    <tr>
+                        <th>Kurye Adı</th>
+                        <th>Bölge (Zone)</th>
+                        <th>Performans (İşlem)</th>
+                        <th>Durum</th>
+                        <th>İşlemler</th>
+                    </tr>
+                    </thead>
+                    <tbody id="tbl-kuryeler"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="mdlKuryeEkle">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title">Yeni Kurye İşe Al</h5>
+                    <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info small">
+                        Kurye bu bilgilerle <b>kurye.html</b> sayfasına giriş yapacaktır.
+                    </div>
+                    <div class="mb-3"><label>Kullanıcı Adı</label><input type="text" id="kUser" class="form-control"></div>
+                    <div class="mb-3"><label>Kurye Telefonu</label><input type="tel" id="kPhone" class="form-control" placeholder="05xx..."></div>
+                    <div class="mb-3"><label>Şifre</label><input type="text" id="kPass" class="form-control"></div>
+                    <div class="mb-3">
+                        <label>Sorumlu Bölge</label>
+                        <select id="kZone" class="form-select"></select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-success w-100" onclick="kuryeKaydet()">KAYDET</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="sayfa-loglar" class="page-section">
+        <div class="white-box">
+            <h4 class="fw-bold mb-3">İşlem Geçmişi</h4>
+            <ul id="log-listesi" class="list-group list-group-flush small" style="max-height:600px; overflow-y:auto"></ul>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="mdlUrunEkle">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white"><h5 class="modal-title">Yeni Ürün</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <form id="frmUrunEkle">
+                    <div class="mb-3 text-center"><label>Görsel</label><input type="file" class="form-control" id="uResim"></div>
+                    <div class="mb-3"><label>Adı</label><input type="text" class="form-control" id="uAd"></div>
+                    <div class="row mb-3">
+                        <div class="col"><label>Fiyat</label><input type="number" class="form-control" id="uFiyat"></div>
+                        <div class="col"><label>Stok</label><input type="number" class="form-control" id="uStok"></div>
+                    </div>
+                    <div class="mb-3"><label>Kritik</label><input type="number" class="form-control" id="uKritik" value="10"></div>
+                    <div class="mb-3"><label>Birim</label><select class="form-select" id="uBirim"><option>Adet</option><option>Kg</option><option>Lt</option><option>Koli</option></select></div>
+                </form>
+            </div>
+            <div class="modal-footer"><button class="btn btn-primary w-100" onclick="urunKaydet()">KAYDET</button></div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="mdlMusEkle">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white"><h5 class="modal-title">Müşteri Ekle</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="mb-3"><label>Ad Soyad</label><input type="text" class="form-control" id="maAd"></div>
+                <div class="mb-3"><label>Telefon</label><input type="text" class="form-control" id="maTel"></div>
+                <div class="mb-3"><label>Adres</label><textarea class="form-control" id="maAdr"></textarea></div>
+                <div class="mb-3">
+                    <label>Bölge (Zone)</label>
+                    <div class="input-group">
+                        <select class="form-select" id="maZone"></select>
+                        <button class="btn btn-secondary" type="button" onclick="hizliBolgeEkle()">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="mb-3"><label>Kritik Bakiye Alarmı (TL)</label><input type="number" class="form-control" id="maLim" value="2000"></div>
+            </div>
+            <div class="modal-footer"><button class="btn btn-success w-100" onclick="musteriKaydet()">KAYDET</button></div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="mdlUrunEdit">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning"><h5 class="modal-title">Düzenle</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <form id="frmUrunEdit"><input type="hidden" id="ueId">
+                    <div class="text-center mb-3"><img id="uePrev" style="width:80px; display:none"><input type="file" class="form-control mt-2" id="ueResim"></div>
+                    <div class="mb-3"><input type="text" class="form-control" id="ueAd"></div>
+                    <div class="row">
+                        <div class="col"><input type="number" class="form-control" id="ueFiyat"></div>
+                        <div class="col"><input type="number" class="form-control" id="ueStok"></div>
+                    </div>
+                    <div class="mt-2"><select id="ueBirim" class="form-select"><option>Adet</option><option>Kg</option><option>Lt</option></select></div>
+                    <div class="mt-3"><input type="number" class="form-control" id="ueKritik"></div>
+                </form>
+            </div>
+            <div class="modal-footer"><button class="btn btn-primary w-100" onclick="urunGuncelle()">GÜNCELLE</button></div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="mMusEdit">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning"><h5 class="modal-title">Müşteri Düzenle</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <input type="hidden" id="meId">
+                <label>Ad Soyad</label><input type="text" id="meAd" class="form-control mb-2">
+                <label>Telefon</label><input type="text" id="meTel" class="form-control mb-2">
+                <label>Adres</label><input type="text" id="meAdr" class="form-control mb-2">
+                <label>Bölge (Zone)</label>
+                <select class="form-select mb-2" id="meZone"></select>
+                <label>Kritik Bakiye Alarmı (TL)</label><input type="number" id="meLim" class="form-control">
+            </div>
+            <div class="modal-footer"><button class="btn btn-warning w-100" onclick="musteriGuncelle()">GÜNCELLE</button></div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="mdlPos" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-white"><h5 class="modal-title">Satış</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-8 border-end">
+                        <input type="text" id="posArama" class="form-control mb-3" placeholder="Ürün Ara..." onkeyup="posFiltrele()">
+                        <div class="row g-3" id="posUrunListesi" style="height: 450px; overflow-y: auto;"></div>
+                    </div>
+                    <div class="col-md-4">
+                        <label>Müşteri:</label><select id="posMusteri" class="form-select mb-3"></select>
+                        <div class="card p-2 bg-light mb-3" style="height: 300px; overflow-y: auto;">
+                            <table class="table table-sm text-center">
+                                <thead class="table-dark"><tr><th>Ürün</th><th>Adet</th><th>Tutar</th><th>Sil</th></tr></thead>
+                                <tbody id="posSepet"></tbody>
+                            </table>
+                        </div>
+                        <div class="d-flex justify-content-between mb-3"><h4>TOPLAM:</h4><h3 class="text-primary fw-bold" id="posToplam">0,00 ₺</h3></div>
+                        <label>Ödeme:</label><select id="posOdeme" class="form-select mb-3"><option>Nakit</option><option>Veresiye</option><option>Kredi Kartı</option></select>
+                        <button class="btn btn-success w-100 btn-lg" onclick="satisYap()">SATIŞI TAMAMLA</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="mTah">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white"><h5 class="modal-title">Tahsilat</h5><button class="btn-close" onclick="modalKapat('mTah')"></button></div>
+            <div class="modal-body">
+                <h5 id="thAd" class="text-center mb-3 fw-bold"></h5><input type="hidden" id="thId">
+                <div class="mb-3"><label>Tutar</label><input type="number" class="form-control" id="thTut"></div>
+                <div class="mb-3"><label>Tip</label><select class="form-select" id="thTip"><option>Nakit</option><option>Kredi Kartı</option><option>Havale</option></select></div>
+            </div>
+            <div class="modal-footer"><button class="btn btn-success w-100" onclick="tahsilatYap()">KAYDET</button></div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="mdlMusteriDetay">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">Müşteri Kartı</h5>
+                <button class="btn-close" onclick="modalKapat('mdlMusteriDetay')"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row mb-3">
+                    <div class="col-md-5">
+                        <div class="p-3 border rounded bg-light h-100">
+                            <h5 id="detAd" class="fw-bold text-primary mb-3">...</h5>
+                            <p class="mb-2"><i class="fas fa-phone me-2 text-muted"></i> <span id="detTel">...</span></p>
+                            <p class="mb-0"><i class="fas fa-map-marker-alt me-2 text-muted"></i> <span id="detAdres">...</span></p>
+                            <p class="mb-0"><i class="fas fa-map-pin me-2 text-warning"></i> <span id="detZone" class="fw-bold">...</span></p>
+                        </div>
+                    </div>
+
+                    <div class="col-md-7">
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <div class="p-2 border rounded text-center bg-white shadow-sm">
+                                    <small class="text-muted d-block">Güncel Bakiye</small>
+                                    <span id="detBakiye" class="fs-5 fw-bold">0 ₺</span>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="p-2 border rounded text-center bg-white shadow-sm">
+                                    <small class="text-muted d-block">⚠️ Kritik Sınır</small>
+                                    <span id="detKritik" class="fs-5 fw-bold text-dark">0 ₺</span>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <div class="p-2 border rounded text-center bg-success text-white shadow-sm">
+                                    <small class="d-block" style="opacity:0.9">💰 Bugüne Kadar Ödediği</small>
+                                    <span id="detToplamOdenen" class="fs-4 fw-bold">0 ₺</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-2 small text-muted d-flex justify-content-between px-1">
+                            <span>🗓 Son İşlem: <span id="detSonOdeme">-</span></span>
+                            <span>💸 Son Tutar: <span id="detSonTutar">-</span></span>
+                        </div>
+                    </div>
+                </div>
+                <h6 class="fw-bold">Geçmiş Siparişler</h6>
+                <div class="table-responsive" style="max-height:300px;overflow-y:auto">
+                    <table class="table table-sm table-hover align-middle">
+                        <thead class="table-light sticky-top">
+                        <tr><th>Tarih</th><th>No</th><th>İçerik</th><th>Tutar</th><th>Durum</th><th>İşlem</th></tr>
+                        </thead>
+                        <tbody id="tbl-musteri-gecmis"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer"><button class="btn btn-secondary" onclick="modalKapat('mdlMusteriDetay')">Kapat</button></div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="mdlStokAnaliz">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white"><h5 class="modal-title">Eksikler</h5><button class="btn-close" onclick="modalKapat('mdlStokAnaliz')"></button></div>
+            <div class="modal-body">
+                <table class="table table-striped text-center">
+                    <thead class="table-dark"><tr><th>Ürün</th><th>Mevcut</th><th>Kritik</th><th class="bg-warning text-dark">Alınacak</th></tr></thead>
+                    <tbody id="tbl-eksikler"></tbody>
+                </table>
+            </div>
+            <div class="modal-footer"><button class="btn btn-primary" onclick="window.print()">Yazdır</button></div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="mdlDetay">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white"><h5 class="modal-title">İçerik</h5><button class="btn-close btn-close-white" onclick="modalKapat('mdlDetay')"></button></div>
+            <div class="modal-body">
+                <table class="table table-bordered">
+                    <thead><tr><th>Ürün</th><th>Adet</th><th>Fiyat</th></tr></thead>
+                    <tbody id="tbl-detay-icerik"></tbody>
+                    <tfoot><tr><td colspan="2" class="text-end fw-bold">TOPLAM:</td><td id="lbl-detay-toplam" class="fw-bold"></td></tr></tfoot>
+                </table>
+            </div>
+            <div class="modal-footer"><button class="btn btn-secondary w-100" onclick="modalKapat('mdlDetay')">Kapat</button></div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="mdlKuryeDuzenle">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title">Kurye Düzenle</h5>
+                <button class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="kdId">
+                <div class="mb-3">
+                    <label>Kullanıcı Adı</label>
+                    <input type="text" id="kdAd" class="form-control">
+                </div>
+                <div class="mb-3">
+                    <label>Telefon Numarası</label>
+                    <input type="tel" id="kdPhone" class="form-control" placeholder="05xx...">
+                </div>
+                <div class="mb-3">
+                    <label>Yeni Şifre (Değişmeyecekse boş bırak)</label>
+                    <input type="text" id="kdPass" class="form-control" placeholder="******">
+                </div>
+                <div class="mb-3">
+                    <label>Bölge (Zone)</label>
+                    <select id="kdZone" class="form-select"></select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-warning w-100" onclick="kuryeGuncelle()">GÜNCELLE</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="mdlKuryeGecmis">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title">Kurye İşlem Geçmişi</h5>
+                <button class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <h5 id="kgBaslik" class="fw-bold text-primary mb-3">...</h5>
+                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                    <table class="table table-sm table-striped">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Tarih</th>
+                                <th>Müşteri</th>
+                                <th>İçerik</th>
+                                <th class="text-end">Tutar</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbl-kurye-gecmis"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Kapat</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<iframe id="gizliYazici" style="position:fixed; left:-9999px; top:0; width:0; height:0; border:none;"></iframe>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    //AYARLAR & GLOBALLER
+    const API = "http://127.0.0.1:3000";
+    const UID = localStorage.getItem('userId');
+    const fmt = (s) => new Intl.NumberFormat('tr-TR', {style:'currency', currency:'TRY'}).format(s);
+
+    let sepet = [], urunler = [], musteriler = [], siparisCache = [], seciliMusteriGecmisi = [];
+
+    //BAŞLANGIÇ
+    window.onload = function() {
+        const kod = localStorage.getItem('shopCode');
+        document.getElementById('lblShopCode').innerText = (kod && kod !== "undefined") ? kod : "KOD YOK";
+
+        herseyiYenile();
+        sayfaGoster('dashboard', document.querySelector('.menu-link.active'));
+    };
+
+    //YARDIMCI FONKSİYONLAR
+    function herseyiYenile() {
+        getUrunler();
+        getMusteriler();
+        getSiparisler();
+        getKuryeler();
+        getStats();
+        getLogs();
+        grafikleriCiz();
+
+        bolgeleriGetir();
+    }
+
+    function sayfaGoster(id, el) {
+        document.querySelectorAll('.page-section').forEach(p => p.style.display = 'none');
+        document.getElementById('sayfa-' + id).style.display = 'block';
+        if(el) {
+            document.querySelectorAll('.sidebar a').forEach(a => a.classList.remove('active'));
+            el.classList.add('active');
+        }
+        document.getElementById('sayfaBasligi').innerText = id === 'dashboard' ? 'Genel Bakış' : id.toUpperCase();
+    }
+
+    function tabDegis(tabId, el) {
+        ['bekleyen', 'yolda', 'teslim'].forEach(t => document.getElementById('tab-' + t).style.display = 'none');
+        document.getElementById('tab-' + tabId).style.display = 'block';
+        document.querySelectorAll('#siparisTablari .nav-link').forEach(b => b.classList.remove('active'));
+        el.classList.add('active');
+    }
+
+    function modalAc(id) { new bootstrap.Modal(document.getElementById(id)).show(); }
+    function modalKapat(id) { bootstrap.Modal.getInstance(document.getElementById(id)).hide(); }
+    function cikisYap() { if(confirm("Çıkış?")){ localStorage.clear(); window.location.href='login.html'; } }
+
+    async function api(url, method = 'GET', body = null) {
+        const headers = { 'user-id': UID };
+        let options = { method, headers };
+        if (body) {
+            if (body instanceof FormData) options.body = body;
+            else { headers['Content-Type'] = 'application/json'; options.body = JSON.stringify(body); }
+        }
+        try { const r = await fetch(API + url, options); return await r.json(); } catch (e) { console.error(e); return {}; }
+    }
+
+    //ÜRÜN İŞLEMLERİ
+    async function getUrunler() {
+        urunler = await api('/urunler');
+        document.getElementById('tbl-urunler').innerHTML = urunler.map(u => `
+            <tr>
+                <td><img src="${u.image_url ? API+u.image_url : ''}" class="urun-img-small" onerror="this.style.display='none'"></td>
+                <td class="fw-bold">${u.name}</td>
+                <td><span class="badge bg-info text-dark">${u.unit || 'Adet'}</span></td>
+                <td>${fmt(u.price)}</td>
+                <td><span class="badge ${u.stock_quantity <= u.critical_level ? 'bg-danger' : 'bg-success'}">${u.stock_quantity}</span></td>
+                <td>
+                    <button class="btn btn-sm btn-warning" onclick="editUrunAc(${u.id})">✏️</button>
+                    <button class="btn btn-sm btn-danger" onclick="urunSil(${u.id})">🗑️</button>
+                </td>
+            </tr>`).join('');
+        stokSayfasiniGetir();
+    }
+
+    async function urunKaydet() {
+        const fd = new FormData(document.getElementById('frmUrunEkle'));
+        fd.append('name', document.getElementById('uAd').value);
+        fd.append('price', document.getElementById('uFiyat').value);
+        fd.append('stock_quantity', document.getElementById('uStok').value);
+        fd.append('critical_level', document.getElementById('uKritik').value);
+        fd.append('unit', document.getElementById('uBirim').value);
+
+        if(document.getElementById('uResim').files[0]) fd.append('resim', document.getElementById('uResim').files[0]);
+
+        await api('/urun-ekle', 'POST', fd);
+        modalKapat('mdlUrunEkle');
+        herseyiYenile();
+    }
+
+    function editUrunAc(id) {
+        const u = urunler.find(x => x.id == id);
+        document.getElementById('ueId').value = u.id;
+        document.getElementById('ueAd').value = u.name;
+        document.getElementById('ueFiyat').value = u.price;
+        document.getElementById('ueStok').value = u.stock_quantity;
+        document.getElementById('ueKritik').value = u.critical_level;
+        document.getElementById('ueBirim').value = u.unit || 'Adet';
+        modalAc('mdlUrunEdit');
+    }
+
+    async function urunGuncelle() {
+        const fd = new FormData();
+        fd.append('id', document.getElementById('ueId').value);
+        fd.append('name', document.getElementById('ueAd').value);
+        fd.append('price', document.getElementById('ueFiyat').value);
+        fd.append('stock_quantity', document.getElementById('ueStok').value);
+        fd.append('critical_level', document.getElementById('ueKritik').value);
+        fd.append('unit', document.getElementById('ueBirim').value);
+
+        if(document.getElementById('ueResim').files[0]) fd.append('resim', document.getElementById('ueResim').files[0]);
+
+        await fetch(API + '/urun-guncelle', { method: 'PUT', headers: { 'user-id': UID }, body: fd });
+        modalKapat('mdlUrunEdit');
+        herseyiYenile();
+    }
+
+    async function urunSil(id) {
+        if(confirm("Silinsin mi?")) {
+            await api('/urun-sil/'+id, 'DELETE');
+            herseyiYenile();
+        }
+    }
+
+    //MÜŞTERİ İŞLEMLERİ
+    async function getMusteriler() {
+        musteriler = await api('/musteriler');
+        musteriler.sort((a, b) => a.name.localeCompare(b.name, 'tr'));
+        renderMusteriTablosu(musteriler);
+    }
+
+    //MÜŞTERİ LİSTELEME
+    function renderMusteriTablosu(liste) {
+        const tMus = document.getElementById('t-mus');
+        if (!tMus) return;
+
+        tMus.innerHTML = liste.map(m => `
+            <tr>
+                <td class="fw-bold">${m.name}</td>
+                <td>${m.phone || '-'}</td>
+                <td class="small text-truncate" style="max-width:150px">${m.address || '-'}</td>
+
+                <td><span class="badge bg-secondary">${fmt(m.critical_balance || 2000)}</span></td>
+
+                <td class="${m.balance > 0 ? 'text-danger fw-bold' : 'text-success'}">${fmt(m.balance)}</td>
+                <td>
+                    <button class="btn btn-sm btn-info" onclick="musteriDetayAc('${m.id}')">🔍</button>
+                    <button class="btn btn-sm btn-success" onclick="tahsilatAc('${m.id}', '${m.name.replace(/'/g, "\\'")}')">💰</button>
+                    <button class="btn btn-sm btn-warning" onclick="editMusteriAc('${m.id}')">✏️</button>
+                    <button class="btn btn-sm btn-danger" onclick="musteriSil('${m.id}')">🗑️</button>
+                </td>
+            </tr>
+        `).join('');
+    }
+    // Arama Fonksiyonu
+    function musteriFiltrele() {
+        const aranan = document.getElementById('musArama').value.toLowerCase();
+        const filtrelenmis = musteriler.filter(m => m.name.toLowerCase().includes(aranan));
+        renderMusteriTablosu(filtrelenmis);
+    }
+
+    async function musteriKaydet() {
+        await api('/musteri-ekle','POST', {
+            name: document.getElementById('maAd').value,
+            phone: document.getElementById('maTel').value,
+            address: document.getElementById('maAdr').value,
+            credit_limit: document.getElementById('maLim').value,
+            zone: document.getElementById('maZone').value
+        });
+        modalKapat('mdlMusEkle');
+        herseyiYenile();
+    }
+
+    async function musteriSil(id) {
+        if(confirm("Silinsin mi?")) {
+            await api('/musteri-sil/'+id, 'DELETE');
+            herseyiYenile();
+        }
+    }
+
+    function editMusteriAc(id) {
+        const m = musteriler.find(x => x.id == id);
+
+        document.getElementById('meId').value = m.id;
+        document.getElementById('meAd').value = m.name;
+        document.getElementById('meTel').value = m.phone || '';
+        document.getElementById('meAdr').value = m.address || '';
+        document.getElementById('meZone').value = m.zone || '';
+        document.getElementById('meLim').value = m.critical_balance || 2000;
+
+        modalAc('mMusEdit');
+    }
+
+    async function musteriGuncelle() {
+        await api('/musteri-guncelle','PUT', {
+            id: document.getElementById('meId').value,
+            name: document.getElementById('meAd').value,
+            phone: document.getElementById('meTel').value,
+            address: document.getElementById('meAdr').value,
+            credit_limit: document.getElementById('meLim').value,
+            zone: document.getElementById('meZone').value
+        });
+        modalKapat('mMusEdit');
+        herseyiYenile();
+    }
+
+    function tahsilatAc(id,isim) {
+        document.getElementById('thId').value = id;
+        document.getElementById('thAd').innerText = isim;
+        document.getElementById('thTut').value = '';
+        modalAc('mTah');
+    }
+
+    async function tahsilatYap() {
+        const v = {
+            musteriId: document.getElementById('thId').value,
+            tutar: document.getElementById('thTut').value,
+            odemeTipi: document.getElementById('thTip').value
+        };
+        if(!v.tutar) return;
+        await api('/tahsilat-yap','POST',v);
+        modalKapat('mTah');
+        herseyiYenile();
+    }
+
+    // MÜŞTERİ PROFİLİ VE DETAYLAR
+    async function musteriDetayAc(id) {
+        const v = await api('/musteri-gecmisi/'+id);
+        if(!v || !v.bilgi) return alert("Müşteri verisi alınamadı");
+
+        const m = v.bilgi;
+        const s = v.siparisler;
+        seciliMusteriGecmisi = s;
+        document.getElementById('detAd').innerText = m.name;
+        document.getElementById('detTel').innerText = m.phone || '-';
+        document.getElementById('detAdres').innerText = m.address || '-';
+
+        const kritik = parseFloat(m.critical_balance || 2000);
+        const bakiye = parseFloat(m.balance || 0);
+        const odenen = parseFloat(m.total_paid || 0);
+
+        document.getElementById('detKritik').innerText = fmt(kritik);
+        document.getElementById('detToplamOdenen').innerText = fmt(odenen);
+        document.getElementById('detZone').innerText = m.zone || 'Merkez';
+
+        const bakiyeEl = document.getElementById('detBakiye');
+        bakiyeEl.innerText = fmt(bakiye);
+
+        if (bakiye > kritik) {
+            bakiyeEl.className = "fs-5 fw-bold text-white bg-danger rounded px-2";
+            bakiyeEl.innerHTML += ' <i class="fas fa-exclamation-triangle" title="LİMİT AŞILDI"></i>';
+        } else if (bakiye > 0) {
+            bakiyeEl.className = "fs-5 fw-bold text-danger";
+        } else {
+            bakiyeEl.className = "fs-5 fw-bold text-success";
+        }
+
+        document.getElementById('detSonOdeme').innerText = m.last_payment_date ? new Date(m.last_payment_date).toLocaleDateString('tr-TR') : '-';
+        document.getElementById('detSonTutar').innerText = (m.last_payment_amount !== null) ? fmt(m.last_payment_amount) : '-';
+
+        const t = document.getElementById('tbl-musteri-gecmis');
+        if(s.length === 0) {
+            t.innerHTML = '<tr><td colspan="6" class="text-center p-3 text-muted">Henüz sipariş kaydı yok.</td></tr>';
+        } else {
+            t.innerHTML = s.map((sip, i) => {
+                const ozet = sip.icerik ? sip.icerik.map(x => x.name || x.urun_adi).join(', ') : '-';
+                return `
+            <tr>
+                <td>${new Date(sip.order_date).toLocaleDateString()}</td>
+                <td>#${sip.group_id}</td>
+                <td class="small text-truncate" style="max-width: 150px;">${ozet}</td>
+                <td class="fw-bold">${fmt(sip.total_price)}</td>
+                <td>${sip.status}</td>
+                <td><button class="btn btn-sm btn-dark" onclick="siparisDetayGoster(seciliMusteriGecmisi[${i}])">Gör</button></td>
+            </tr>`;
+            }).join('');
+        }
+        modalAc('mdlMusteriDetay');
+    }
+
+    function posEkraniAc() {
+        sepet = [];
+        sepetiGuncelle();
+        posFiltrele();
+
+        document.getElementById('posMusteri').innerHTML = '<option value="">-- Müşteri Seç --</option>' +
+            musteriler.map(m => {
+                const bakiye = parseFloat(m.balance || 0);
+
+                return `<option value="${m.id}">${m.name} (Borç: ${fmt(bakiye)})</option>`;
+            }).join('');
+
+        modalAc('mdlPos');
+    }
+
+    function posFiltrele() {
+        const v = document.getElementById('posArama').value.toLowerCase();
+        document.getElementById('posUrunListesi').innerHTML = urunler.filter(u => u.name.toLowerCase().includes(v) && u.stock_quantity > 0).map(u => `
+            <div class="col-4">
+                <div class="pos-item" onclick="sepeteEkle(${u.id})">
+                    <img src="${u.image_url ? API+u.image_url : ''}" onerror="this.style.display='none'">
+                    <div class="mt-1 fw-bold text-truncate">${u.name}</div>
+                    <div class="mt-1"><span class="text-primary fw-bold">${fmt(u.price)}</span></div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function sepeteEkle(id) {
+        const u = urunler.find(x => x.id == id);
+        const s = sepet.find(x => x.id == id);
+        if(s) {
+            if(s.adet < u.stock_quantity) s.adet++;
+            else alert("Stok yok");
+        } else {
+            sepet.push({ id: u.id, name: u.name, price: u.price, unit: u.unit||'Adet', adet: 1 });
+        }
+        sepetiGuncelle();
+    }
+
+    function sepetiGuncelle() {
+        let t = 0;
+        document.getElementById('posSepet').innerHTML = sepet.map((s, i) => {
+            t += s.price * s.adet;
+            const stk = urunler.find(u => u.id == s.id).stock_quantity;
+            return `
+            <tr>
+                <td class="text-start">${s.name}</td>
+                <td style="width:120px"><input type="number" class="form-control text-center p-1" value="${s.adet}" min="1" max="${stk}" onchange="miktarKontrol(this,${i},${stk})"></td>
+                <td>${fmt(s.price * s.adet)}</td>
+                <td><i class="fas fa-trash text-danger cursor-pointer" onclick="sepet.splice(${i},1);sepetiGuncelle()"></i></td>
+            </tr>`;
+        }).join('');
+        document.getElementById('posToplam').innerText = fmt(t);
+    }
+
+    function miktarKontrol(e, i, mx) {
+        let v = parseInt(e.value);
+        if(v > mx) { alert("Max: "+mx); e.value = mx; sepet[i].adet = mx; }
+        else if(v < 1) { e.value = 1; sepet[i].adet = 1; }
+        else { sepet[i].adet = v; }
+        sepetiGuncelle();
+    }
+
+    async function satisYap(force = false) {
+        const mId = document.getElementById('posMusteri').value;
+        if(!mId) return alert("Müşteri seç!");
+        if(sepet.length == 0) return alert("Sepet boş");
+
+        const res = await fetch(API+'/toplu-satis', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json', 'user-id':UID},
+            body: JSON.stringify({
+                musteriId: mId,
+                sepet: sepet,
+                odemeTipi: document.getElementById('posOdeme').value,
+                limitAsimIzni: force
+            })
+        });
+
+        const j = await res.json();
+
+        if(res.status === 409) {
+            if(confirm(j.mesaj)) satisYap(true);
+        } else if(res.ok) {
+            modalKapat('mdlPos');
+            herseyiYenile();
+            if(confirm("Fiş Yazdırılsın mı?")) fisYazdir(j.fisVerisi);
+        } else {
+            alert(j.message);
+        }
+    }
+
+    //FİŞ YAZDIR
+    function fisYazdir(d) {
+        const frame = document.getElementById('gizliYazici');
+        const doc = frame.contentWindow.document;
+
+        const html = `
+            <html><head><style>
+                body { font-family: 'Courier New', monospace; font-size: 12px; text-align: center; width: 300px; }
+                .baslik { font-weight: bold; border-bottom: 2px dashed black; padding-bottom: 5px; }
+                table { width: 100%; margin-top: 10px; }
+                .sol { text-align: left; } .sag { text-align: right; }
+                .toplam { font-weight: bold; text-align: right; border-top: 1px dashed black; margin-top: 10px; padding-top: 5px; }
+            </style></head><body>
+                <div class="baslik">MANDIRA MARKET</div>
+                <div>${d.tarih}<br>Fiş No: #${d.siparisNo}</div>
+                <table>${d.sepet.map(i => `<tr><td class="sol">${i.name}</td><td class="sag">${i.adet} x ${i.price}</td></tr>`).join('')}</table>
+                <div class="toplam">TOPLAM: ${fmt(d.toplam)}</div>
+                <br><i>Afiyet Olsun! 🐮</i>
+            </body></html>
+        `;
+
+        doc.open(); doc.write(html); doc.close();
+        setTimeout(() => { frame.contentWindow.focus(); frame.contentWindow.print(); }, 500);
+    }
+
+    //SİPARİŞ LİSTESİ
+    async function getSiparisler() {
+        siparisCache = await api('/siparisler');
+
+        ['bekleyen','yolda','teslim'].forEach(k => {
+            document.getElementById('l-'+k).innerHTML = '';
+            document.getElementById('cnt-'+k).innerText = '0';
+        });
+
+        siparisCache.forEach((s, i) => {
+            let st = s.status || 'Bekliyor';
+            let k = 'bekleyen';
+            if(st == 'Yolda') k = 'yolda';
+            else if(st == 'Teslim Edildi') k = 'teslim';
+
+            document.getElementById('cnt-'+k).innerText = parseInt(document.getElementById('cnt-'+k).innerText) + 1;
+
+            document.getElementById('l-'+k).innerHTML += `
+            <tr>
+                <td>${new Date(s.order_date).toLocaleDateString()}</td>
+                <td>#${s.group_id}</td>
+                <td>${s.musteri_adi || s.musteri || 'Misafir'}</td>
+                <td>${fmt(s.total_price)}</td>
+                <td><button class="btn btn-sm btn-dark" onclick="siparisDetayGoster(siparisCache[${i}])">Gör</button></td>
+                <td>
+                    <select class="form-select form-select-sm" onchange="durumDegis('${s.group_id}', this.value)">
+                        <option ${st=='Bekliyor'?'selected':''}>Bekliyor</option>
+                        <option ${st=='Yolda'?'selected':''}>Yolda</option>
+                        <option ${st=='Teslim Edildi'?'selected':''}>Teslim Edildi</option>
+                    </select>
+                </td>
+            </tr>`;
+        });
+    }
+
+    async function durumDegis(gid, s) {
+        await api('/siparis-durum','POST', {groupId: gid, durum: s});
+        herseyiYenile();
+    }
+
+    //SİPARİŞ İÇERİK GÖSTERİCİ
+    function siparisDetayGoster(sip) {
+        if(!sip) return alert("Sipariş verisi bulunamadı.");
+
+        const urunListesi = sip.icerik || [];
+
+        document.getElementById('tbl-detay-icerik').innerHTML = urunListesi.map(x => {
+
+            const urunAdi = x.name || x.urun_adi || x.product_name || "İsimsiz Ürün";
+
+            const adet = parseFloat(x.quantity || x.adet || x.qty || x.miktar || x.count || 0);
+
+            let birimFiyat = parseFloat(x.price || x.birim_fiyat || x.fiyat || 0);
+
+            const satirToplamiHam = parseFloat(x.total || x.tutar || x.toplam || 0);
+            if (birimFiyat === 0 && satirToplamiHam > 0 && adet > 0) {
+                birimFiyat = satirToplamiHam / adet;
+            }
+
+            const hesaplananToplam = birimFiyat * adet;
+
+            return `
+                <tr>
+                    <td>${urunAdi}</td>
+                    <td class="text-center fw-bold">${adet}</td>
+                    <td class="text-end">${fmt(hesaplananToplam)}</td>
+                </tr>`;
+        }).join('');
+
+        document.getElementById('lbl-detay-toplam').innerText = fmt(sip.total_price || sip.toplam || 0);
+        modalAc('mdlDetay');
+    }
+
+    function stokSayfasiniGetir() {
+        const v = document.getElementById('stokArama').value.toLowerCase();
+        document.getElementById('tbl-stokgiris').innerHTML = urunler.filter(u => u.name.toLowerCase().includes(v)).map(u => `
+            <tr>
+                <td><img src="${u.image_url ? API+u.image_url : ''}" style="width:50px;border-radius:5px" onerror="this.style.display='none'"></td>
+                <td class="fw-bold">${u.name}</td>
+                <td><span class="badge ${u.stock_quantity <= u.critical_level ? 'bg-danger' : 'bg-success'}">${u.stock_quantity} ${u.unit||''}</span></td>
+                <td><div class="input-group"><input type="number" id="inp-stok-${u.id}" class="form-control" placeholder="0"><span class="input-group-text">${u.unit||'Adet'}</span></div></td>
+                <td><button class="btn btn-primary btn-sm" onclick="stokEkle(${u.id})">EKLE</button></td>
+            </tr>
+        `).join('');
+    }
+
+    async function stokEkle(id) {
+        const m = document.getElementById('inp-stok-'+id).value;
+        if(!m || m <= 0) return alert("Miktar gir");
+        const r = await api('/stok-artir','POST', {id: id, miktar: m});
+        if(r.message == "Stok güncellendi.") { alert("Eklendi!"); getUrunler(); }
+        else alert(r.message);
+    }
+
+    function excelYukle(input, tip) {
+        if (!input.files[0]) return;
+        const r = new FileReader();
+        r.onload = async(e) => {
+            const w = XLSX.read(e.target.result, {type:'array'});
+            const d = XLSX.utils.sheet_to_json(w.Sheets[w.SheetNames[0]]);
+            if(d.length > 0 && confirm("Yüklensin mi?")) {
+                const res = await api(tip == 'musteri' ? '/musteriler-toplu-ekle' : '/urunler-toplu-ekle', 'POST', d);
+                alert(res.message);
+                herseyiYenile();
+            }
+            input.value = '';
+        };
+        r.readAsArrayBuffer(input.files[0]);
+    }
+
+    async function getStats() {
+        const v = await api('/istatistikler');
+        document.getElementById('d-ciro').innerText = fmt(v.ciro || 0);
+        document.getElementById('d-stok').innerText = fmt(v.stok || 0);
+        document.getElementById('d-alarm').innerText = (v.kritik || 0) + " Adet";
+    }
+
+    async function getLogs() {
+        const d = await api('/loglar');
+        document.getElementById('log-listesi').innerHTML = d.map(x => `<li class="list-group-item">${x.message}</li>`).join('');
+    }
+
+    async function grafikleriCiz() {
+        const d = await api('/grafik-verileri');
+        if(window.ch1) window.ch1.destroy();
+        window.ch1 = new Chart(document.getElementById('chartSatis'), {
+            type: 'line',
+            data: { labels: d.gunlukSatislar.map(x=>x.tarih), datasets: [{label:'Ciro', data:d.gunlukSatislar.map(x=>x.ciro), borderColor:'#0d6efd', fill:true}] }
+        });
+
+        if(window.ch2) window.ch2.destroy();
+        window.ch2 = new Chart(document.getElementById('chartUrun'), {
+            type: 'doughnut',
+            data: { labels: d.populerUrunler.map(x=>x.name), datasets: [{data: d.populerUrunler.map(x=>x.adet), backgroundColor: ['#ffc107','#0dcaf0','#198754','#d63384','#6610f2']}] }
+        });
+    }
+
+    function stokAnalizAc() {
+        const e = urunler.filter(u => u.stock_quantity <= u.critical_level);
+        document.getElementById('tbl-eksikler').innerHTML = e.length == 0 ? '<tr><td colspan="4">Kritik ürün yok.</td></tr>' : e.map(u => `<tr><td>${u.name}</td><td class="text-danger fw-bold">${u.stock_quantity}</td><td>${u.critical_level}</td><td class="bg-warning fw-bold">+${(u.critical_level*2)-u.stock_quantity}</td></tr>`).join('');
+        modalAc('mdlStokAnaliz');
+    }
+    //BÖLGE (ZONE) YÖNETİMİ
+
+    async function bolgeleriGetir() {
+        const bolgeler = await api('/bolgeler');
+
+        const kutular = ['kZone', 'maZone', 'meZone', 'kdZone'];
+
+        kutular.forEach(kutuId => {
+            const el = document.getElementById(kutuId);
+            if(!el) return;
+
+            el.innerHTML = '';
+
+            if(bolgeler.length === 0) {
+                el.innerHTML = '<option value="Merkez">Merkez</option>';
+            } else {
+                el.innerHTML = bolgeler.map(b => `<option value="${b.name}">${b.name}</option>`).join('');
+            }
+        });
+    }
+
+    async function hizliBolgeEkle() {
+        const ad = prompt("Yeni Bölge Adı Girin (Örn: Pendik):");
+        if(!ad) return;
+
+        const res = await api('/bolge-ekle', 'POST', { name: ad });
+
+        if(res.message === "Bölge eklendi.") {
+            alert("✅ Bölge eklendi!");
+            bolgeleriGetir();
+        } else {
+            alert("Hata: " + (res.message || "Eklenemedi"));
+        }
+    }
+    async function getKuryeler() {
+        const liste = await api('/kuryeler');
+        const tbl = document.getElementById('tbl-kuryeler');
+        if(!tbl) return;
+
+        tbl.innerHTML = liste.map(k => `
+            <tr>
+                <td class="fw-bold">
+                    <div class="d-flex align-items-center">
+                        <div class="bg-light rounded-circle d-flex align-items-center justify-content-center me-2" style="width:35px; height:35px;">
+                            <i class="fas fa-motorcycle text-dark"></i>
+                        </div>
+                        ${k.name}
+                    </div>
+                </td>
+
+                <td><span class="badge bg-info text-dark">${k.zone || 'Merkez'}</span></td>
+
+                <td style="width: 30%;">
+                    <div class="d-flex align-items-center">
+                        <span class="fw-bold me-2 text-primary">${k.islem_sayisi} Teslimat</span>
+                        <div class="progress flex-grow-1" style="height: 8px;">
+                            <div class="progress-bar bg-success" style="width: ${Math.min(k.islem_sayisi*5, 100)}%"></div>
+                        </div>
+                    </div>
+                </td>
+
+                <td><span class="badge bg-success">Aktif</span></td>
+
+                <td>
+                    <button class="btn btn-sm btn-warning shadow-sm" onclick="kuryeDuzenleAc('${k.id}', '${k.name}', '${k.zone}', '${k.phone}')" title="Düzenle">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-sm btn-info text-white shadow-sm" onclick="kuryeGecmisAc('${k.id}', '${k.name}')" title="Geçmiş & Performans">
+                        <i class="fas fa-history"></i>
+                    </button>
+                    <button class="btn btn-sm btn-danger shadow-sm" onclick="alert('Silme işlemi yakında...')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    async function kuryeKaydet() {
+        const u = document.getElementById('kUser').value;
+        const p = document.getElementById('kPass').value;
+        const z = document.getElementById('kZone').value;
+        const ph = document.getElementById('kPhone').value;
+
+        if(!u || !p) return alert("Kullanıcı adı ve şifre girin.");
+
+        const res = await api('/kurye-ekle', 'POST', { username: u, password: p, zone: z, phone: ph });
+
+        if(res.message) {
+            alert(res.message);
+            modalKapat('mdlKuryeEkle');
+            herseyiYenile();
+        } else {
+            alert("Hata oluştu");
+        }
+    }
+    //MOBİL MENÜ AÇ/KAPA
+    function menuyuAcKapa() {
+        document.querySelector('.sidebar').classList.toggle('aktif');
+    }
+
+    document.querySelector('.main-content').addEventListener('click', function(e) {
+        if(e.target.id !== 'mobilMenuBtn' && e.target.parentElement.id !== 'mobilMenuBtn') {
+            document.querySelector('.sidebar').classList.remove('aktif');
+        }
+    });
+    //KURYE İŞLEMLERİ (DÜZENLEME & GEÇMİŞ)
+
+    function kuryeDuzenleAc(id, ad, zone, phone) {
+        document.getElementById('kdId').value = id;
+        document.getElementById('kdAd').value = ad;
+        document.getElementById('kdPhone').value = (phone === 'null' || !phone) ? '' : phone;
+        document.getElementById('kdPass').value = '';
+
+        bolgeleriGetir().then(() => {
+            document.getElementById('kdZone').value = zone || 'Merkez';
+        });
+
+        modalAc('mdlKuryeDuzenle');
+    }
+
+    //Kuryeyi Güncelle
+    async function kuryeGuncelle() {
+        const id = document.getElementById('kdId').value;
+        const ad = document.getElementById('kdAd').value;
+        const pass = document.getElementById('kdPass').value;
+        const zone = document.getElementById('kdZone').value;
+        const phone = document.getElementById('kdPhone').value;
+
+        if(!ad) return alert("Ad boş olamaz");
+
+        const res = await api('/kurye-guncelle', 'PUT', {
+            id: id, name: ad, password: pass, zone: zone, phone: phone
+        });
+
+        if(res.message) {
+            alert(res.message);
+            modalKapat('mdlKuryeDuzenle');
+            herseyiYenile();
+        } else {
+            alert("Hata oluştu");
+        }
+    }
+
+    async function kuryeGecmisAc(id, ad) {
+        document.getElementById('kgBaslik').innerText = `${ad} - Teslimat Geçmişi`;
+
+        const siparisler = await api('/kurye-detayli-gecmis/' + id);
+        const tBody = document.getElementById('tbl-kurye-gecmis');
+
+        if(siparisler.length === 0) {
+            tBody.innerHTML = '<tr><td colspan="4" class="text-center p-3">Henüz teslimat kaydı yok.</td></tr>';
+        } else {
+            tBody.innerHTML = siparisler.map(s => {
+                const urunOzet = s.icerik ? s.icerik.map(x=> `${x.name} (${x.quantity})`).join(', ') : '-';
+
+                return `
+                <tr>
+                    <td><small>${new Date(s.tarih).toLocaleDateString()} ${new Date(s.tarih).toLocaleTimeString([],{hour:'2-digit', minute:'2-digit'})}</small></td>
+                    <td>
+                        <div class="fw-bold">${s.musteri_adi}</div>
+                        <small class="text-muted">${s.bolge || ''}</small>
+                    </td>
+                    <td class="small text-truncate" style="max-width: 150px;" title="${urunOzet}">${urunOzet}</td>
+                    <td class="text-end">
+                        <div class="fw-bold text-success">${fmt(s.tutar)}</div>
+                        <small class="badge bg-light text-dark border">${s.odeme_tipi || '-'}</small>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        modalAc('mdlKuryeGecmis');
+    }
+
+</script>
+</body>
+</html>

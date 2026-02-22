@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kurye Paneli</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background-color: #f0f2f5; font-family: 'Segoe UI', sans-serif; padding-bottom: 90px; }
+        .header { background: #2c3e50; color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 10px rgba(0,0,0,0.2); }
+        .order-card { background: white; border-radius: 12px; padding: 15px; margin: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border-left: 5px solid #ccc; position: relative; }
+        .status-yolda { border-left-color: #0d6efd; background-color: #f8fbff; }
+        .status-bekliyor { border-left-color: #ffc107; }
+        .bottom-nav { position: fixed; bottom: 0; width: 100%; background: white; border-top: 1px solid #ddd; display: flex; justify-content: space-around; padding: 12px 0; z-index: 1000; height: 70px; }
+        .nav-item { text-align: center; color: #6c757d; font-size: 0.85rem; cursor: pointer; }
+        .nav-item.active { color: #0d6efd; font-weight: bold; }
+        .nav-item i { font-size: 1.5rem; display: block; margin-bottom: 3px; }
+        .item-badge { background: #eee; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; color: #555; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div>
+        <h5 class="m-0 fw-bold"><i class="fas fa-motorcycle"></i> KuryeApp</h5>
+        <small id="bolgeAdi" class="opacity-75">Bölge Yükleniyor...</small>
+    </div>
+    <button class="btn btn-sm btn-outline-danger border-0" onclick="cikisYap()"><i class="fas fa-sign-out-alt fa-lg"></i></button>
+</div>
+
+<div id="siparis-listesi" class="container pb-3">
+    <div class="text-center mt-5"><div class="spinner-border text-primary"></div></div>
+</div>
+
+<div class="bottom-nav">
+    <div class="nav-item active" onclick="listeyiYenile()"><i class="fas fa-box-open"></i> Siparişler</div>
+    <div class="nav-item" onclick="kasaAc()"><i class="fas fa-wallet"></i> Kasa & Rapor</div>
+</div>
+
+<div class="modal fade" id="mdlTeslim" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 shadow">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title fw-bold">Teslimat & Tahsilat</h5>
+                <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 text-center">
+                <p class="text-muted mb-1">Toplam Sipariş Tutarı</p>
+                <h1 id="lblTutar" class="fw-bold text-dark display-4 mb-4">0.00 ₺</h1>
+
+                <label class="fw-bold text-success mb-2">Alınan Tutar</label>
+                <input type="number" id="inpAlinan" class="form-control form-control-lg text-center fw-bold mb-4 border-success" style="font-size: 1.5rem;" placeholder="Tutar Girin">
+
+                <div class="d-grid gap-2">
+                    <button class="btn btn-success btn-lg py-3 fw-bold" onclick="teslimatYap('Nakit')">
+                        <i class="fas fa-money-bill-wave me-2"></i> NAKİT ALDIM
+                    </button>
+                    <button class="btn btn-primary btn-lg py-3 fw-bold" onclick="teslimatYap('Kredi Kartı')">
+                        <i class="fas fa-credit-card me-2"></i> KART ÇEKTİM
+                    </button>
+                    <button class="btn btn-secondary py-2 fw-bold" onclick="teslimatYap('Veresiye')">
+                        <i class="fas fa-user-clock me-2"></i> VERESİYE (Para Alınmadı)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="mdlDetay">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content rounded-4">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title fw-bold">Sipariş İçeriği</h5>
+                <button class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-3">
+                <h5 id="d-musteri" class="fw-bold text-primary">...</h5>
+                <p id="d-adres" class="text-muted small border-bottom pb-2">...</p>
+                <ul id="d-liste" class="list-group list-group-flush"></ul>
+                <a id="btn-harita" href="#" target="_blank" class="btn btn-outline-primary w-100 mt-3 fw-bold"><i class="fas fa-location-arrow"></i> HARİTADA AÇ</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="mdlKasa" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content rounded-4 border-0">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="fas fa-wallet"></i> Gün Sonu Raporu</h5>
+                <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body bg-light">
+                <input type="date" id="kasaTarih" class="form-control mb-3 text-center fw-bold shadow-sm" onchange="kasaRaporuGetir()">
+                <div class="row g-2 mb-3 text-center">
+                    <div class="col-6"><div class="p-3 bg-white rounded shadow-sm border-start border-primary border-4"><small class="text-muted fw-bold">TOPLAM CİRO</small><h5 id="k-ciro" class="fw-bold mb-0">0 ₺</h5></div></div>
+                    <div class="col-6"><div class="p-3 bg-white rounded shadow-sm border-start border-success border-4"><small class="text-muted fw-bold">NAKİT (CEPTE)</small><h5 id="k-nakit" class="fw-bold text-success mb-0">0 ₺</h5></div></div>
+                    <div class="col-6"><div class="p-3 bg-white rounded shadow-sm border-start border-info border-4"><small class="text-muted fw-bold">KREDİ KARTI</small><h5 id="k-kart" class="fw-bold text-info mb-0">0 ₺</h5></div></div>
+                    <div class="col-6"><div class="p-3 bg-white rounded shadow-sm border-start border-secondary border-4"><small class="text-muted fw-bold">VERESİYE</small><h5 id="k-veresiye" class="fw-bold text-secondary mb-0">0 ₺</h5></div></div>
+                </div>
+                <h6 class="fw-bold text-muted ps-2">Teslimat Geçmişi</h6>
+                <ul id="kasa-liste" class="list-group list-group-flush small bg-white rounded shadow-sm"></ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    const API = "http://127.0.0.1:3000";
+    const UID = localStorage.getItem('userId');
+
+    if (!UID) window.location.href = 'login.html';
+
+    let aktifSiparisler = [];
+    let seciliSiparis = null;
+
+    window.onload = function() {
+        listeyiYenile();
+        document.getElementById('kasaTarih').value = new Date().toISOString().split('T')[0];
+    };
+
+    async function listeyiYenile() {
+        try {
+            const res = await fetch(API + '/kurye-siparisleri', { headers: {'user-id': UID} });
+            if(!res.ok) throw new Error("Veri alınamadı");
+
+            const veri = await res.json();
+            document.getElementById('bolgeAdi').innerText = "Bölge: " + (veri.bolge || "Tanımsız");
+            aktifSiparisler = veri.siparisler;
+            renderSiparisler();
+        } catch (err) { console.error(err); }
+    }
+
+    function renderSiparisler() {
+        const div = document.getElementById('siparis-listesi');
+        div.innerHTML = '';
+
+        if(aktifSiparisler.length === 0) {
+            div.innerHTML = '<div class="text-center mt-5 text-muted"><h5>Sipariş Yok</h5><button class="btn btn-primary mt-3" onclick="listeyiYenile()">Yenile</button></div>';
+            return;
+        }
+
+        aktifSiparisler.forEach((s, index) => {
+            const stil = s.status === 'Yolda' ? 'status-yolda' : 'status-bekliyor';
+            const durumText = s.status === 'Yolda' ? '🛵 Yolda' : '⏳ Hazır';
+            const isOdenmis = (s.payment_type && s.payment_type !== 'Veresiye');
+            const odemeEtiketi = isOdenmis
+                ? `<span class="badge bg-success bg-opacity-10 text-success border border-success ms-2"><i class="fas fa-check-circle"></i> ÖDENDİ (${s.payment_type})</span>`
+                : `<span class="badge bg-danger bg-opacity-10 text-danger border border-danger ms-2"><i class="fas fa-exclamation-circle"></i> TAHSİLAT YOK</span>`;
+
+            const aksiyonButonu = isOdenmis
+                ? `<button class="btn btn-primary btn-sm fw-bold px-3 py-2 shadow-sm" onclick="hizliTeslimEt('${s.group_id}', '${s.payment_type}')"><i class="fas fa-check"></i> TESLİM ET (ÖDENDİ)</button>`
+                : `<button class="btn btn-success btn-sm fw-bold px-3 py-2 shadow-sm" onclick="teslimModalAc(${index})"><i class="fas fa-lira-sign"></i> TAHSİLAT YAP</button>`;
+
+
+            let urunOzet = "Detay Yok";
+            if(s.icerik && s.icerik.length > 0) {
+                urunOzet = s.icerik[0].name + (s.icerik.length > 1 ? ` (+${s.icerik.length-1} ürün)` : '');
+            }
+
+            div.innerHTML += `
+                <div class="order-card ${stil}">
+                    <div onclick="detayAc(${index})">
+                        <div class="d-flex justify-content-between mb-2">
+                            <div><span class="badge ${s.status === 'Yolda' ? 'bg-primary' : 'bg-warning text-dark'}">${durumText}</span></div>
+                            <small class="fw-bold text-muted">${new Date(s.order_date).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</small>
+                        </div>
+                        <h5 class="fw-bold text-dark mb-1">${s.musteri_adi}</h5>
+                        <p class="small text-muted mb-2 text-truncate">${s.adres}</p>
+                        <div class="mb-2">${odemeEtiketi}</div>
+
+                        <div class="bg-light p-2 rounded mb-3 border d-flex align-items-center">
+                            <i class="fas fa-shopping-bag text-secondary me-2"></i>
+                            <span class="fw-bold small text-dark text-truncate">${urunOzet}</span>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center border-top pt-3 mt-2">
+                        <h4 class="fw-bold text-dark m-0">${parseFloat(s.total_price).toFixed(2)} ₺</h4>
+                        <div>
+                            ${s.status !== 'Yolda' ?
+                `<button class="btn btn-outline-primary btn-sm me-2 fw-bold" onclick="durumGuncelle('${s.group_id}', 'Yolda')">Yola</button>` : ''}
+                            ${aksiyonButonu}
+                        </div>
+                    </div>
+                </div>`;
+        });
+    }
+
+    //DETAY GÖSTERME
+    function detayAc(index) {
+        const s = aktifSiparisler[index];
+        document.getElementById('d-musteri').innerText = s.musteri_adi;
+        document.getElementById('d-adres').innerText = s.adres;
+        document.getElementById('btn-harita').href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.adres)}`;
+        const ul = document.getElementById('d-liste');
+        ul.innerHTML = (s.icerik || []).map(x => `
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span>${x.name || x.urun_adi}</span>
+                    <span class="item-badge">${x.quantity || x.adet} ${x.unit || 'Adet'}</span>
+                </li>
+            `).join('');
+        new bootstrap.Modal(document.getElementById('mdlDetay')).show();
+    }
+
+    //HIZLI TESLİMAT
+    async function hizliTeslimEt(id, mevcutOdemeTipi) {
+        if(!confirm("Zaten ödenmiş bu siparişi teslim ettin mi?")) return;
+
+        try {
+            const res = await fetch(API + '/siparis-durum', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json', 'user-id':UID},
+                body: JSON.stringify({
+                    groupId: id,
+                    durum: 'Teslim Edildi',
+                    odemeTipi: mevcutOdemeTipi
+                })
+            });
+
+            if(res.ok) {
+                alert("✅ Teslimat kaydedildi.");
+                listeyiYenile();
+            }
+        } catch(e) { console.error(e); }
+    }
+
+    //NORMAL TESLİMAT VE TAHSİLAT
+    function teslimModalAc(index) {
+        seciliSiparis = aktifSiparisler[index];
+        document.getElementById('lblTutar').innerText = parseFloat(seciliSiparis.total_price).toFixed(2) + ' ₺';
+        document.getElementById('inpAlinan').value = seciliSiparis.total_price;
+        new bootstrap.Modal(document.getElementById('mdlTeslim')).show();
+    }
+
+    async function teslimatYap(tip) {
+        if(!seciliSiparis) return;
+        const btn = event.target;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        btn.disabled = true;
+
+        const alinan = parseFloat(document.getElementById('inpAlinan').value) || 0;
+        const toplam = parseFloat(seciliSiparis.total_price);
+        let kaydedilecekTip = tip;
+
+        if(tip !== 'Veresiye' && alinan < toplam && alinan > 0) kaydedilecekTip = `Kısmi (${tip})`;
+
+        try {
+            if(tip !== 'Veresiye' && alinan > 0) {
+                await fetch(API + '/tahsilat-yap', {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json', 'user-id':UID},
+                    body: JSON.stringify({ musteriId: seciliSiparis.customer_id, tutar: alinan, odemeTipi: tip })
+                });
+            }
+
+            const res = await fetch(API + '/siparis-durum', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json', 'user-id':UID},
+                body: JSON.stringify({
+                    groupId: seciliSiparis.group_id,
+                    durum: 'Teslim Edildi',
+                    odemeTipi: kaydedilecekTip
+                })
+            });
+
+            if(res.ok) {
+                bootstrap.Modal.getInstance(document.getElementById('mdlTeslim')).hide();
+                alert("✅ Tahsilat ve Teslimat Başarılı!");
+                listeyiYenile();
+            }
+        } catch(e) { alert("Hata: " + e.message); }
+        finally { btn.disabled = false; }
+    }
+
+    //BASİT DURUM
+    async function durumGuncelle(id, durum) {
+        await fetch(API + '/siparis-durum', {
+            method: 'POST', headers: {'Content-Type':'application/json', 'user-id':UID},
+            body: JSON.stringify({ groupId: id, durum: durum })
+        });
+        listeyiYenile();
+    }
+
+    // --- KASA ---
+    function kasaAc() { kasaRaporuGetir(); new bootstrap.Modal(document.getElementById('mdlKasa')).show(); }
+    async function kasaRaporuGetir() {
+        const tarih = document.getElementById('kasaTarih').value;
+        const ul = document.getElementById('kasa-liste');
+        ul.innerHTML = '<div class="text-center p-3"><div class="spinner-border spinner-border-sm"></div></div>';
+        try {
+            const res = await fetch(`${API}/kurye-kasa-ozeti?tarih=${tarih}`, { headers: {'user-id':UID} });
+            const veri = await res.json();
+            const o = veri.ozet;
+            document.getElementById('k-ciro').innerText = o.ciro + ' ₺';
+            document.getElementById('k-nakit').innerText = o.nakit + ' ₺';
+            document.getElementById('k-kart').innerText = o.kart + ' ₺';
+            document.getElementById('k-veresiye').innerText = o.veresiye + ' ₺';
+
+            if(!veri.liste.length) ul.innerHTML = '<li class="list-group-item text-center">Veri yok.</li>';
+            else ul.innerHTML = veri.liste.map(s => `<li class="list-group-item d-flex justify-content-between"><span>#${s.id.substring(0,6)} <small class="text-muted">(${s.payment_type})</small></span><span class="fw-bold">${parseFloat(s.total).toFixed(2)}₺</span></li>`).join('');
+        } catch(e) { ul.innerHTML = 'Hata'; }
+    }
+    function cikisYap() { if(confirm("Çıkış?")) { localStorage.clear(); window.location.href = 'login.html'; } }
+</script>
+</body>
+</html>
